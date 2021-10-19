@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "psinfo.h"
 
 struct cpu cpus[NCPU];
 
@@ -104,7 +105,7 @@ allocpid() {
 static struct proc*
 allocproc(void)
 {
-  struct proc *p;
+  struct proc *p = myproc();
   p->priority = 10;
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
@@ -449,8 +450,15 @@ scheduler(void)
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
         struct proc *curr_priority_proc = p;
-        for(i = p+1; i < &proc[NPROC]; ++i) {
-
+        int min = curr_priority_proc->priority; //minimum number for priority comparison
+        struct proc *comp_priority_proc;
+        for(comp_priority_proc = p+1; comp_priority_proc < &proc[NPROC]; comp_priority_proc++) {
+          if(comp_priority_proc->state == RUNNABLE) {
+            if(comp_priority_proc->priority < min) {
+              min = comp_priority_proc->priority;
+              p = comp_priority_proc;
+            }
+          }
         }
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
@@ -659,18 +667,18 @@ procdump(void)
   }
 }
 
-int ps(uint64 addr) {
-  struct ps_info data[MAX_PROC];
-  /*todo
-
-  */
-  if(copyout(p->pagetable, addr, (char *)data, sizeof(data)) < 0) {
+int ps(struct ps_info *addr) {
+  struct ps_proc data[MAX_PROC];
+  struct proc *p;
+  
+  p = myproc();
+  if(copyout(p->pagetable, , (char *)data, sizeof(data)) < 0) {
     return -1;
   }
   return 1;
 }
 
-uint64 fork2(uint64 prio) {
+int fork2(uint64 prio) {
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
