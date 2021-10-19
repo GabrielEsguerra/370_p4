@@ -37,4 +37,4 @@ entry("sbrk");
 entry("sleep");
 entry("uptime");
 entry("ps");
-entry("fork2");
+#entry("fork2");

@@ -106,7 +106,7 @@ sys_ps(void) {
 
   return ps(addr);
 }
-
+/*
 uint64
 sys_fork2(void) {
   int prio;
@@ -114,4 +114,4 @@ sys_fork2(void) {
     return -1;
   }
   return fork2(prio);
-}
+}*/

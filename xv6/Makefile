@@ -134,7 +134,7 @@ UPROGS=\
 	$U/_zombie\
 	$U/_uscheduler\
 	$U/_ps\
-	$U/_fork2\
+#	$U/_fork2\
 
 $U/context_switch.o : $U/context_switch.S
 	$(CC) $(CFLAGS) -c -o $U/context_switch.o $U/context_switch.S
