@@ -277,6 +277,12 @@ fork(void)
   struct proc *np;
   struct proc *p = myproc();
 
+  if(p->priority != 0) {
+    np->priority = p->priority - 2;
+  }
+  else {
+    np->priority = 0;
+  }
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
@@ -448,18 +454,23 @@ scheduler(void)
 
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        struct proc *curr_priority_proc = p;
-        int min = curr_priority_proc->priority; //minimum number for priority comparison
-        struct proc *comp_priority_proc;
-        for(comp_priority_proc = p+1; comp_priority_proc < &proc[NPROC]; comp_priority_proc++) {
-          if(comp_priority_proc->state == RUNNABLE) {
-            if(comp_priority_proc->priority < min) {
-              min = comp_priority_proc->priority;
-              p = comp_priority_proc;
+      if (p->state != RUNNABLE) {
+        continue; //skip if process is not runnable
+      }
+      else {
+          struct proc *CURR_PRIORITY_PROC = p;
+          for(p = CURR_PRIORITY_PROC+1; p < &proc[NPROC]; p++) {
+            if(p->state != RUNNABLE) {
+              continue; //skip if process is not runnable
+            }
+            else {
+              if(p->priority < CURR_PRIORITY_PROC->priority) {
+                CURR_PRIORITY_PROC = p; //if the found process has a higher priority, we update the current priority process
+              }
             }
           }
-        }
+        p = CURR_PRIORITY_PROC;
+      }
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
@@ -670,7 +681,9 @@ procdump(void)
 int ps(struct ps_info *addr) {
   struct ps_proc data[MAX_PROC];
   struct proc *p;
-  
+  sti();
+
+
   p = myproc();
   if(copyout(p->pagetable, , (char *)data, sizeof(data)) < 0) {
     return -1;
