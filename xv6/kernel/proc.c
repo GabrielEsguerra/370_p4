@@ -449,10 +449,12 @@ scheduler(void)
   
   c->proc = 0;
   for(;;){
+    
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-
     for(p = proc; p < &proc[NPROC]; p++) {
+      int checkPrev = 0;
+      struct proc *temp = p;  
       acquire(&p->lock);
       if (p->state != RUNNABLE) {
         continue; //skip if process is not runnable
@@ -464,11 +466,24 @@ scheduler(void)
               continue; //skip if process is not runnable
             }
             else {
-              if(p->priority < CURR_PRIORITY_PROC->priority) {
-                CURR_PRIORITY_PROC = p; //if the found process has a higher priority, we update the current priority process
+              if(checkPrev == 0) {
+                if(p->priority < CURR_PRIORITY_PROC->priority) {
+                  CURR_PRIORITY_PROC = p; //if the found process has a higher priority, we update the current priority process
+                  checkPrev = 1;
+                }  
               }
+              else {
+                if(p->priority < CURR_PRIORITY_PROC->priority && CURR_PRIORITY_PROC != temp) {
+                  CURR_PRIORITY_PROC = p;
+                  temp = p;
+                }
+                else {
+                  continue;
+                }
+              }    
             }
-          }
+          }     
+
         p = CURR_PRIORITY_PROC;
       }
         // Switch to chosen process.  It is the process's job
@@ -477,11 +492,10 @@ scheduler(void)
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
-
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
-      }
+      }    
       release(&p->lock);
     }
 }
@@ -677,19 +691,60 @@ procdump(void)
   }
 }
 
-int ps(struct ps_proc *addr) {
+
+int ps(uint64 addr) {
   struct ps_proc data[MAX_PROC];
   struct proc *p;
   intr_on(); //allow interrupts
-  for(int i = 0; i < MAX_PROC; ++i) {
-    data[i] = addr[i];
+  int i = 0;
+  for(p = proc; p < &proc[NPROC]; p++) {
+    if(p->state == USED) {
+      data[i].state = 1;
+      safestrcpy(data[i].name, p->name, sizeof(p->name));
+      data[i].pid = p->pid;
+      data[i].priority = p->priority;
+      ++i;
+    }
+    else if (p->state == SLEEPING) {
+      data[i].state = 2;
+      safestrcpy(data[i].name, p->name, sizeof(p->name));
+      data[i].pid = p->pid;
+      data[i].priority = p->priority;
+      ++i;
+    }
+    else if (p->state == RUNNABLE) {
+      data[i].state = 3;
+      safestrcpy(data[i].name, p->name, sizeof(p->name));
+      data[i].pid = p->pid;
+      data[i].priority = p->priority;
+      ++i;
+    }
+    else if (p->state == RUNNING) {
+      data[i].state = 4;
+      safestrcpy(data[i].name, p->name, sizeof(p->name));
+      data[i].pid = p->pid;
+      data[i].priority = p->priority;
+      ++i;
+    }
+    else if (p->state == ZOMBIE) {
+      data[i].state = 5;
+      safestrcpy(data[i].name, p->name, sizeof(p->name));
+      data[i].pid = p->pid;
+      data[i].priority = p->priority;
+      ++i;
+    }
+    else {
+      ++i;
+      continue;
+    }
   }
-  if(copyout(p->pagetable, &data, (char *)data, sizeof(data)) < 0) {
+    
+  if(copyout(p->pagetable, addr, (char *)data, sizeof(data)) < 0) {
     return -1;
   }
   return 1;
 }
-
+/*
 int fork2(uint64 prio) {
   int i, pid;
   struct proc *np;
@@ -707,19 +762,12 @@ int fork2(uint64 prio) {
     return -1;
   }
   np->sz = p->sz;
-
+  np->priority = prio;
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
-  if(p->priority > 0) {
-    np->priority = p->priority - 2;
-  }
-  else {
-    np->priority = 0;
-  }
-
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
@@ -742,4 +790,4 @@ int fork2(uint64 prio) {
 
   return pid;
 
-}
+} */
