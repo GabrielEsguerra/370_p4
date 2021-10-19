@@ -276,7 +276,7 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
-
+  np = p;
   if(p->priority != 0) {
     np->priority = p->priority - 2;
   }
@@ -484,7 +484,6 @@ scheduler(void)
       }
       release(&p->lock);
     }
-  }
 }
 
 // Switch to scheduler.  Must hold only p->lock
@@ -678,14 +677,14 @@ procdump(void)
   }
 }
 
-int ps(struct ps_info *addr) {
+int ps(struct ps_proc *addr) {
   struct ps_proc data[MAX_PROC];
   struct proc *p;
-  sti();
-
-
-  p = myproc();
-  if(copyout(p->pagetable, , (char *)data, sizeof(data)) < 0) {
+  intr_on(); //allow interrupts
+  for(int i = 0; i < MAX_PROC; ++i) {
+    data[i] = addr[i];
+  }
+  if(copyout(p->pagetable, &data, (char *)data, sizeof(data)) < 0) {
     return -1;
   }
   return 1;
