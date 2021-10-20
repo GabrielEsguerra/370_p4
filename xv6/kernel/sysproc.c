@@ -99,19 +99,13 @@ sys_uptime(void)
 uint64
 sys_ps(void) {
   uint64 addr;
-
-  if(argaddr(0, &addr) < 0) {
-    return -1;
-  }
+  if(argaddr(0, &addr) < 0) return -1;
 
   return ps(addr);
 }
-/*
-uint64
-sys_fork2(void) {
+
+uint64 sys_fork2(void) {
   int prio;
-  if(argint(0, &prio) < 0) {
-    return -1;
-  }
+  if(argint(0, &prio) < 0) return -1;
   return fork2(prio);
-}*/
+}

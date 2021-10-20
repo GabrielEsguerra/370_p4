@@ -105,11 +105,13 @@ allocpid() {
 static struct proc*
 allocproc(void)
 {
-  struct proc *p = myproc();
-  p->priority = 10;
+  struct proc *p;
+  
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
+    p->priority = 10;
     if(p->state == UNUSED) {
+      
       goto found;
     } else {
       release(&p->lock);
@@ -276,13 +278,7 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
-  np = p;
-  if(p->priority != 0) {
-    np->priority = p->priority - 2;
-  }
-  else {
-    np->priority = 0;
-  }
+
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
@@ -301,7 +297,9 @@ fork(void)
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
-
+  if(p->priority != 0) {
+    np->priority = p->priority - 2;
+  }
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
@@ -449,55 +447,66 @@ scheduler(void)
   
   c->proc = 0;
   for(;;){
-    
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-    for(p = proc; p < &proc[NPROC]; p++) {
-      int checkPrev = 0;
-      struct proc *temp = p;  
-      acquire(&p->lock);
-      if (p->state != RUNNABLE) {
-        continue; //skip if process is not runnable
-      }
-      else {
-          struct proc *CURR_PRIORITY_PROC = p;
-          for(p = CURR_PRIORITY_PROC+1; p < &proc[NPROC]; p++) {
-            if(p->state != RUNNABLE) {
-              continue; //skip if process is not runnable
-            }
-            else {
-              if(checkPrev == 0) {
-                if(p->priority < CURR_PRIORITY_PROC->priority) {
-                  CURR_PRIORITY_PROC = p; //if the found process has a higher priority, we update the current priority process
-                  checkPrev = 1;
-                }  
-              }
-              else {
-                if(p->priority < CURR_PRIORITY_PROC->priority && CURR_PRIORITY_PROC != temp) {
-                  CURR_PRIORITY_PROC = p;
-                  temp = p;
-                }
-                else {
-                  continue;
-                }
-              }    
-            }
-          }     
 
-        p = CURR_PRIORITY_PROC;
-      }
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE) {
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
+
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
-      }    
+      }
       release(&p->lock);
     }
+  }
+  //=========RR PRIORITY ATTEMPT ==============================
+  /* tried to get it to work :P 
+  struct proc *p;
+  struct cpu *c = mycpu();
+  struct proc *CURR_PRIORITY_PROC;
+  c->proc = 0;
+  for(;;){
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        for(CURR_PRIORITY_PROC = p+1; CURR_PRIORITY_PROC < &proc[NPROC]; CURR_PRIORITY_PROC++) {
+          acquire(&CURR_PRIORITY_PROC->lock);
+          if(CURR_PRIORITY_PROC->state == RUNNABLE && CURR_PRIORITY_PROC->priority < p->priority) {
+            release(&p->lock);
+            p = CURR_PRIORITY_PROC;
+          }
+          else {
+            release(&CURR_PRIORITY_PROC->lock);
+          }
+              
+        }
+      }
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        p->priority = p->priority+2;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+        
+    }
+    release(&p->lock);
+  } */
 }
 
 // Switch to scheduler.  Must hold only p->lock
@@ -691,11 +700,10 @@ procdump(void)
   }
 }
 
-
 int ps(uint64 addr) {
   struct ps_proc data[MAX_PROC];
   struct proc *p;
-  intr_on(); //allow interrupts
+  
   int i = 0;
   for(p = proc; p < &proc[NPROC]; p++) {
     if(p->state == USED) {
@@ -739,12 +747,12 @@ int ps(uint64 addr) {
     }
   }
     
-  if(copyout(p->pagetable, addr, (char *)data, sizeof(data)) < 0) {
+  if(copyout(myproc()->pagetable, addr, (char *)data, sizeof(data)) < 0) {
     return -1;
   }
   return 1;
 }
-/*
+
 int fork2(uint64 prio) {
   int i, pid;
   struct proc *np;
@@ -762,12 +770,13 @@ int fork2(uint64 prio) {
     return -1;
   }
   np->sz = p->sz;
-  np->priority = prio;
+
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
+  np->priority = prio;
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
@@ -789,5 +798,4 @@ int fork2(uint64 prio) {
   release(&np->lock);
 
   return pid;
-
-} */
+}
